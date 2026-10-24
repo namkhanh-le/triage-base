@@ -1,4 +1,18 @@
+
 import OpenAI from "openai";
+import { z } from "zod";
+
+const chatRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().trim().min(1),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -12,15 +26,14 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("message" in body) ||
-    typeof body.message !== "string" ||
-    !body.message.trim()
-  ) {
+  const parsed = chatRequestSchema.safeParse(body);
+
+  if (!parsed.success) {
     return Response.json(
-      { error: "Please provide a non-empty message string." },
+      {
+        error:
+          "Invalid chat history. Send between 1 and 50 non-empty user or assistant messages.",
+      },
       { status: 400 },
     );
   }
@@ -48,12 +61,9 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "You are a helpful assistant for a support ticket triage application.",
+            "You are a helpful assistant for a support ticket triage application. Use the conversation history to answer the user's latest message.",
         },
-        {
-          role: "user",
-          content: body.message,
-        },
+        ...parsed.data.messages,
       ],
     });
 
@@ -79,7 +89,10 @@ export async function POST(request: Request) {
     );
 
     return Response.json(
-      { error: "The AI request failed. Check the server terminal for details." },
+      {
+        error:
+          "The AI request failed. Check the server terminal for details.",
+      },
       { status: 502 },
     );
   }

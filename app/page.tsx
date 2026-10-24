@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -17,7 +18,14 @@ export default function ChatPage() {
     event.preventDefault();
     if (isSending || !text.trim()) return;
 
-    const message = text;
+    const message = text.trim();
+
+    // Include the previous conversation and the new message.
+    const history = [
+      ...messages.map(({ role, text }) => ({ role, content: text })),
+      { role: "user" as const, content: message },
+    ];
+
     setIsSending(true);
     setError(null);
 
@@ -25,8 +33,9 @@ export default function ChatPage() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ messages: history }),
       });
+
       const data: unknown = await response.json();
 
       if (!response.ok) {
@@ -37,6 +46,7 @@ export default function ChatPage() {
           typeof data.error === "string"
             ? data.error
             : "Unable to send your message. Please try again.";
+
         throw new Error(detail);
       }
 
@@ -46,14 +56,15 @@ export default function ChatPage() {
         !("answer" in data) ||
         typeof data.answer !== "string"
       ) {
-        throw new Error("The server returned an invalid reply. Please try again.");
+        throw new Error(
+          "The server returned an invalid reply. Please try again.",
+        );
       }
 
-      const answer = data.answer;
       setMessages((previous) => [
         ...previous,
         { role: "user", text: message },
-        { role: "assistant", text: answer },
+        { role: "assistant", text: data.answer as string },
       ]);
       setText("");
     } catch (error) {
@@ -70,7 +81,8 @@ export default function ChatPage() {
   return (
     <main className="chat">
       <h1>Support chat</h1>
-      <p>Send a message and get an echo reply.</p>
+      <p>Chat with the AI. It can use earlier messages in this conversation.</p>
+
       <section
         className="messages"
         role="log"
@@ -78,13 +90,17 @@ export default function ChatPage() {
         aria-live="polite"
       >
         {messages.length === 0 && <p>No messages yet.</p>}
+
         {messages.map((message, index) => (
           <div className={`message ${message.role}`} key={index}>
-            <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
+            <strong>
+              {message.role === "user" ? "You" : "Assistant"}
+            </strong>
             <p>{message.text}</p>
           </div>
         ))}
       </section>
+
       <form onSubmit={sendMessage} aria-busy={isSending}>
         <label htmlFor="message">Your message</label>
         <textarea
