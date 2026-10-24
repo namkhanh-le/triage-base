@@ -13,9 +13,9 @@ export const prioritySchema = z.enum(["low", "medium", "high"]);
 export const triageRequestSchema = z.object({
   ticket: z.object({
     ticket_id: z.string().optional(),
-    subject: z.string(),
-    body: z.string(),
-  }),
+    subject: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(10000),
+    }),
   strategy: z.enum(["llm", "dm", "dm+llm"]).default("llm"),
 });
 
